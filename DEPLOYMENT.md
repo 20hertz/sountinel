@@ -1,6 +1,6 @@
-# Sound Sentinel Deployment Guide
+# Sountinel Deployment Guide
 
-This guide covers deploying the Sound Sentinel Devvit app to Reddit.
+This guide covers deploying the Sountinel Devvit app to Reddit.
 
 ## Prerequisites
 
@@ -67,9 +67,9 @@ devvit playtest sound_sentinel_dev
 
 2. Check the logs for processing:
    ```
-   [Sound Sentinel] New post detected: abc123
-   [Sound Sentinel] Extracted Drive link: https://drive.google.com/...
-   [Sound Sentinel] Successfully indexed post abc123
+   [Sountinel] New post detected: abc123
+   [Sountinel] Extracted Drive link: https://drive.google.com/...
+   [Sountinel] Successfully indexed post abc123
    ```
 
 3. Verify DynamoDB entry:

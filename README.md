@@ -1,4 +1,4 @@
-# Getting started with sound-sentinel
+# Getting started with sountinel
 
 Your project has been created using a Devvit template.
 

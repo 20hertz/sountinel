@@ -1,4 +1,4 @@
-# Sound Sentinel Implementation Summary
+# Sountinel Implementation Summary
 
 ## Overview
 
@@ -7,7 +7,7 @@ Successfully ported the Reddit Post Monitoring System from Python/Lambda to **fu
 ## Project Structure
 
 ```
-/Users/stephane/Dev/boomtap/sound-sentinel/
+/Users/stephane/Dev/boomtap/sountinel/
 ├── src/
 │   ├── main.ts                    # Devvit PostSubmit handler (main app)
 │   ├── linkExtractor.ts           # Google Drive URL extraction
@@ -73,7 +73,7 @@ Successfully ported the Reddit Post Monitoring System from Python/Lambda to **fu
 
 **Error Handling:**
 - Fail-closed approach (skip post on error, don't crash subreddit)
-- Comprehensive logging with `[Sound Sentinel]` prefix
+- Comprehensive logging with `[Sountinel]` prefix
 - Try-catch blocks throughout
 
 ### 4. DynamoDB Integration
@@ -240,7 +240,7 @@ devvit logs Drumkits
 
 ### Log Format
 ```
-[Sound Sentinel] <message>
+[Sountinel] <message>
 ```
 All logs prefixed for easy filtering.
 
@@ -265,19 +265,19 @@ See `DEPLOYMENT.md` for comprehensive troubleshooting guide.
 ## Files Created/Modified
 
 ### Created
-- `/sound-sentinel/src/googleDriveValidator.ts` (348 lines)
-- `/sound-sentinel/src/linkExtractor.ts` (62 lines)
-- `/sound-sentinel/src/__tests__/linkExtractor.test.ts` (219 lines)
-- `/sound-sentinel/src/__tests__/googleDriveValidator.test.ts` (115 lines)
-- `/sound-sentinel/.env.example` (7 lines)
-- `/sound-sentinel/DEPLOYMENT.md` (223 lines)
-- `/sound-sentinel/IMPLEMENTATION_SUMMARY.md` (this file)
+- `/sountinel/src/googleDriveValidator.ts` (348 lines)
+- `/sountinel/src/linkExtractor.ts` (62 lines)
+- `/sountinel/src/__tests__/linkExtractor.test.ts` (219 lines)
+- `/sountinel/src/__tests__/googleDriveValidator.test.ts` (115 lines)
+- `/sountinel/.env.example` (7 lines)
+- `/sountinel/DEPLOYMENT.md` (223 lines)
+- `/sountinel/IMPLEMENTATION_SUMMARY.md` (this file)
 
 ### Modified
-- `/sound-sentinel/src/main.ts` (replaced nuke template with PostSubmit handler)
-- `/sound-sentinel/package.json` (added dependencies and test scripts)
-- `/sound-sentinel/tsconfig.json` (override Devvit base config for Jest)
-- `/sound-sentinel/.gitignore` (added .env files)
+- `/sountinel/src/main.ts` (replaced nuke template with PostSubmit handler)
+- `/sountinel/package.json` (added dependencies and test scripts)
+- `/sountinel/tsconfig.json` (override Devvit base config for Jest)
+- `/sountinel/.gitignore` (added .env files)
 
 ### Reference (Not Modified)
 - `/reddit-monitor/src/lambdas/monitor/handler.py`

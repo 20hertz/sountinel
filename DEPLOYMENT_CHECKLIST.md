@@ -1,4 +1,4 @@
-# Deployment Checklist for Sound Sentinel
+# Deployment Checklist for Sountinel
 
 ## ✅ Completed
 
@@ -35,7 +35,7 @@
 
 ### Step 1: Create IAM User (15 minutes)
 
-**Follow**: `/sound-sentinel/IAM_SETUP_GUIDE.md`
+**Follow**: `/sountinel/IAM_SETUP_GUIDE.md`
 
 **Option 2 (Traditional IAM User)** is recommended for easier Devvit integration.
 
@@ -80,7 +80,7 @@ aws dynamodb describe-table \
 ### Step 3: Configure Devvit Secrets (5 minutes)
 
 ```bash
-cd /Users/stephane/Dev/boomtap/sound-sentinel
+cd /Users/stephane/Dev/boomtap/sountinel
 
 # Login to Devvit (if not already)
 npm run login
@@ -107,7 +107,7 @@ AWS_SECRET_ACCESS_KEY
 ### Step 4: Deploy Devvit App to Test Subreddit (5 minutes)
 
 ```bash
-cd /Users/stephane/Dev/boomtap/sound-sentinel
+cd /Users/stephane/Dev/boomtap/sountinel
 
 # Upload app to Devvit
 npm run deploy
@@ -118,8 +118,8 @@ devvit install sound_sentinel_dev
 
 **Expected output:**
 ```
-✅ Successfully uploaded sound-sentinel
-✅ Successfully installed sound-sentinel on r/sound_sentinel_dev
+✅ Successfully uploaded sountinel
+✅ Successfully installed sountinel on r/sound_sentinel_dev
 ```
 
 ---
@@ -289,7 +289,7 @@ devvit logs Drumkits
 ## 📁 File Structure
 
 ```
-/sound-sentinel/
+/sountinel/
 ├── src/
 │   ├── main.ts                          # PostSubmit handler ✓
 │   ├── linkExtractor.ts                 # URL extraction ✓
