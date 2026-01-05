@@ -1,59 +1,57 @@
 /**
  * Sountinel - Reddit Post Monitoring System
  *
- * This Devvit app monitors r/Drumkits (and r/sound_sentinel_dev for testing)
+ * This Devvit app monitors r/Drumkits (and r/sountinel_dev for testing)
  * for new posts containing Google Drive links to drum kit sample packs.
  *
  * Architecture:
  * - Listens for PostSubmit events
  * - Extracts Google Drive links from post URLs
- * - Sends post metadata to AWS API Gateway via HMAC-signed webhooks
- * - AWS Lambda processes and stores posts in DynamoDB
+ * - Creates GitHub Issues with post metadata
+ * - AWS Lambda polls GitHub Issues and processes them
  *
- * Environment Variables (configured via Devvit settings):
- * - aws_api_endpoint: API Gateway endpoint URL
- * - hmac_secret: HMAC shared secret for request signing
+ * Settings (configured via Devvit CLI or Reddit Developer Portal):
+ * - github_token: GitHub Personal Access Token (app-scoped secret)
+ * - github_repo: GitHub repository (format: owner/repo)
  */
 
 import { Devvit } from '@devvit/public-api';
-import { signRequest } from './hmac.js';
 import { extractSupportedLink } from './linkExtractor.js';
-import { extractGoogleDriveId } from './googleDriveValidator.js';
 
 Devvit.configure({
   redditAPI: true,
-  http: true, // Required for webhook API calls
+  http: true,
 });
 
 // App settings
 Devvit.addSettings([
   {
     type: 'string',
-    name: 'aws_api_endpoint',
-    label: 'AWS API Gateway Endpoint',
-    defaultValue: 'https://axp7cyasld.execute-api.ca-central-1.amazonaws.com/webhook/reddit-post',
-    scope: 'installation',
+    name: 'github_token',
+    label: 'GitHub Personal Access Token',
+    helpText: 'Create at github.com/settings/tokens with repo scope',
+    isSecret: true,
+    scope: 'app',
   },
   {
     type: 'string',
-    name: 'hmac_secret',
-    label: 'HMAC Shared Secret',
-    isSecret: true,
-    scope: 'app',
+    name: 'github_repo',
+    label: 'GitHub Queue Repository',
+    helpText: 'Format: owner/repo (e.g., 20hertz/sountinel-queue)',
+    defaultValue: '20hertz/sountinel-queue',
+    scope: 'installation',
   },
 ]);
 
 /**
  * PostSubmit trigger - listens for new posts in the subreddit
  *
- * This is the main entry point for the monitoring system. When a new post
- * is submitted, this handler:
- * 1. Gets AWS API endpoint and HMAC secret from settings
+ * When a new post is submitted, this handler:
+ * 1. Gets GitHub configuration from settings
  * 2. Extracts Google Drive links from post URL
  * 3. Prepares payload with post metadata
- * 4. Signs payload with HMAC-SHA256
- * 5. Sends signed webhook to AWS API Gateway
- * 6. AWS Lambda validates signature and stores in DynamoDB
+ * 4. Creates GitHub Issue with formatted body
+ * 5. AWS Lambda polls issues hourly and processes them
  */
 Devvit.addTrigger({
   event: 'PostSubmit',
@@ -62,12 +60,11 @@ Devvit.addTrigger({
       console.log(`[Sountinel] New post detected: ${event.post?.id}`);
 
       // 1. Get configuration from app settings
-      const apiEndpoint = await context.settings.get('aws_api_endpoint') as string;
-      const hmacSecret = await context.settings.get('hmac_secret') as string;
+      const githubToken = await context.settings.get('github_token') as string;
+      const githubRepo = await context.settings.get('github_repo') as string;
 
-      if (!hmacSecret || !apiEndpoint) {
-        console.error('[Sountinel] Missing configuration: HMAC secret or API endpoint not set');
-        console.error('[Sountinel] Configure via: https://developers.reddit.com/apps/sountinel');
+      if (!githubToken || !githubRepo) {
+        console.error('[Sountinel] Missing GitHub configuration');
         return;
       }
 
@@ -77,7 +74,7 @@ Devvit.addTrigger({
       // 3. Extract Google Drive link
       const driveLink = extractSupportedLink(post.url);
       if (!driveLink) {
-        console.log(`[Sountinel] Post ${post.id} has no supported Google Drive link - skipping`);
+        console.log(`[Sountinel] Post ${post.id} has no Google Drive link - skipping`);
         return;
       }
 
@@ -97,35 +94,36 @@ Devvit.addTrigger({
         driveUrl: driveLink,
       };
 
-      console.log(`[Sountinel] Prepared payload for post ${post.id}`);
-
-      // 5. Sign request with HMAC
-      const { timestamp, signature } = signRequest(payload, hmacSecret);
-      console.log(`[Sountinel] Generated HMAC signature for timestamp ${timestamp}`);
-
-      // 6. Send to AWS API Gateway
-      const response = await fetch(apiEndpoint, {
+      // 5. Create GitHub Issue
+      const response = await fetch(`https://api.github.com/repos/${githubRepo}/issues`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${githubToken}`,
           'Content-Type': 'application/json',
-          'X-Timestamp': timestamp,
-          'X-Signature': signature,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          title: `Reddit Post: ${post.id}`,
+          body: `# Reddit Post from r/${post.subredditName}\n\n` +
+                `**Post**: [${post.title}](https://reddit.com${post.permalink})\n` +
+                `**Author**: u/${post.authorName || '[deleted]'}\n` +
+                `**Drive Link**: ${driveLink}\n\n` +
+                `## Payload\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``,
+          labels: ['pending', 'sountinel'],
+        }),
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log(`[Sountinel] ✅ Successfully processed post ${post.id}:`, JSON.stringify(result));
+        const issue = await response.json();
+        console.log(`[Sountinel] ✅ Created GitHub issue #${issue.number}: ${issue.html_url}`);
       } else {
         const errorText = await response.text();
-        console.error(`[Sountinel] ❌ API request failed: ${response.status} ${response.statusText}`);
-        console.error(`[Sountinel] Error details: ${errorText}`);
+        console.error(`[Sountinel] ❌ GitHub API failed: ${response.status}`, errorText);
       }
 
     } catch (error) {
-      console.error('[Sountinel] ❌ Error processing post:', error);
-      // Don't throw - we don't want to break the subreddit if our monitoring fails
+      console.error('[Sountinel] ❌ Error:', error);
     }
   },
 });
