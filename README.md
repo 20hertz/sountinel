@@ -20,28 +20,30 @@ This architecture solves Devvit's HTTP allowlist restrictions (AWS endpoints blo
 ### Deploy App
 
 ```bash
-# Deploy to Devvit
+# Upload to Devvit
 npm run deploy
-
-# Install to test subreddit
-npx devvit install sountinel_dev
 ```
 
 ### Configure Settings
 
-Settings are configured at the app level via Devvit CLI:
+Settings must be configured via the [Developer Portal](https://developers.reddit.com/apps/sountinel):
+
+1. **GitHub Personal Access Token** (app-scoped)
+   - Create at [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` scope
+   - Set once for all installations
+   - Configure at: https://developers.reddit.com/apps/sountinel
+
+2. **GitHub Repository** (installation-scoped)
+   - Format: `owner/repo` (e.g., `20hertz/sountinel-queue`)
+   - Can differ per subreddit installation
+   - Configure after installation at: https://developers.reddit.com/r/SUBREDDIT/apps/sountinel
+
+### Install to Test Subreddit
 
 ```bash
-# Set GitHub Personal Access Token (app-scoped)
-npx devvit settings set github_token --app sountinel
-# Paste your token (create at github.com/settings/tokens with repo scope)
-
-# Set GitHub repository (installation-scoped)
-npx devvit settings set github_repo --subreddit sountinel_dev
-# Enter: 20hertz/sountinel-queue
+# Create a small test subreddit first (<200 members for private apps)
+npx devvit install sountinel_dev
 ```
-
-Alternatively, configure via the [Developer Portal](https://developers.reddit.com/apps/sountinel).
 
 ### Test
 
@@ -87,8 +89,10 @@ sountinel/
 ├── src/
 │   ├── main.ts              # PostSubmit handler (creates GitHub issues)
 │   ├── linkExtractor.ts     # Google Drive URL extraction
-│   └── googleDriveValidator.ts # Drive ID extraction (unused in Phase 1)
+│   └── __tests__/           # Unit tests
 ├── devvit.yaml              # Devvit config (HTTP allowlist)
+├── PRIVACY.md               # Privacy policy (required for publishing)
+├── TERMS.md                 # Terms & conditions (required for publishing)
 └── package.json
 ```
 
@@ -141,11 +145,30 @@ Posts without Drive links are silently skipped.
 
 ## Production Deployment
 
+### Prerequisites
+
+Apps using the HTTP plugin require privacy policy and terms & conditions:
+
+1. Ensure [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) are committed to GitHub
+2. Add URLs to Developer Portal settings:
+   - Privacy Policy: `https://raw.githubusercontent.com/20hertz/sountinel/main/PRIVACY.md`
+   - Terms & Conditions: `https://raw.githubusercontent.com/20hertz/sountinel/main/TERMS.md`
+
+### Publishing
+
 ```bash
-# Install to r/Drumkits
+# 1. Publish the app
+npx devvit publish
+
+# 2. Wait for Reddit approval (can take several days)
+
+# 3. Install to r/Drumkits (after approval)
 npx devvit install Drumkits
 
-# Monitor logs
+# 4. Configure settings via Developer Portal
+# https://developers.reddit.com/r/Drumkits/apps/sountinel
+
+# 5. Monitor logs
 npx devvit logs Drumkits
 ```
 
@@ -158,15 +181,14 @@ Check logs for errors:
 npx devvit logs sountinel_dev
 ```
 
-Verify settings:
-```bash
-npx devvit settings list --app sountinel
-npx devvit settings list --subreddit sountinel_dev
-```
+Verify settings via Developer Portal:
+- App settings: https://developers.reddit.com/apps/sountinel
+- Installation settings: https://developers.reddit.com/r/sountinel_dev/apps/sountinel
 
 Common issues:
-- GitHub token invalid or expired
+- GitHub token invalid or expired (check token has `repo` scope)
 - GitHub repo name incorrect (format: `owner/repo`)
+- Settings not configured via Developer Portal
 - Post URL doesn't contain Google Drive link
 
 ### GitHub API errors

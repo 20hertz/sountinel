@@ -1,69 +1,118 @@
 /**
  * Sountinel - Reddit Post Monitoring System
  *
- * This Devvit app monitors r/Drumkits (and r/sound_sentinel_dev for testing)
+ * This Devvit app monitors r/Drumkits (and r/sountinel_dev for testing)
  * for new posts containing Google Drive links to drum kit sample packs.
  *
  * Architecture:
  * - Listens for PostSubmit events
  * - Extracts Google Drive links from post URLs
- * - Sends post metadata to AWS API Gateway via HMAC-signed webhooks
- * - AWS Lambda processes and stores posts in DynamoDB
+ * - Creates GitHub Issues with post metadata
+ * - AWS Lambda polls GitHub Issues and processes them
  *
- * Environment Variables (configured via Devvit settings):
- * - aws_api_endpoint: API Gateway endpoint URL
- * - hmac_secret: HMAC shared secret for request signing
+ * Settings (configured via Devvit CLI or Reddit Developer Portal):
+ * - github_token: GitHub Personal Access Token (app-scoped secret)
+ * - github_repo: GitHub repository (format: owner/repo)
  */
 import { Devvit } from '@devvit/public-api';
 import { extractSupportedLink } from './linkExtractor.js';
-import { extractGoogleDriveId } from './googleDriveValidator.js';
 Devvit.configure({
     redditAPI: true,
-    http: true, // Required for webhook API calls
+    http: true,
 });
+// App settings
+Devvit.addSettings([
+    {
+        type: 'string',
+        name: 'github_token',
+        label: 'GitHub Personal Access Token',
+        helpText: 'Create at github.com/settings/tokens with repo scope',
+        isSecret: true,
+        scope: 'app',
+    },
+    {
+        type: 'string',
+        name: 'github_repo',
+        label: 'GitHub Queue Repository',
+        helpText: 'Format: owner/repo (e.g., 20hertz/sountinel-queue)',
+        defaultValue: '20hertz/sountinel-queue',
+        scope: 'installation',
+    },
+]);
 /**
  * PostSubmit trigger - listens for new posts in the subreddit
  *
- * This is the main entry point for the monitoring system. When a new post
- * is submitted, this handler:
- * 1. Extracts the post URL
- * 2. Checks if it contains a Google Drive link
- * 3. Logs the post for monitoring
- *
- * TODO Phase 2, Days 2-3: Implement HMAC signing and webhook posting to AWS
+ * When a new post is submitted, this handler:
+ * 1. Gets GitHub configuration from settings
+ * 2. Extracts Google Drive links from post URL
+ * 3. Prepares payload with post metadata
+ * 4. Creates GitHub Issue with formatted body
+ * 5. AWS Lambda polls issues hourly and processes them
  */
 Devvit.addTrigger({
     event: 'PostSubmit',
     async onEvent(event, context) {
         try {
             console.log(`[Sountinel] New post detected: ${event.post?.id}`);
-            // 1. Extract post metadata
-            const postId = event.post?.id;
-            if (!postId) {
-                console.error('[Sountinel] No post ID in event');
+            // 1. Get configuration from app settings
+            const githubToken = await context.settings.get('github_token');
+            const githubRepo = await context.settings.get('github_repo');
+            if (!githubToken || !githubRepo) {
+                console.error('[Sountinel] Missing GitHub configuration');
                 return;
             }
-            const post = await context.reddit.getPostById(postId);
-            const postUrl = post.url;
-            console.log(`[Sountinel] Post URL: ${postUrl}`);
-            // 2. Extract Google Drive link
-            const driveLink = extractSupportedLink(postUrl);
+            // 2. Get post details
+            const post = await context.reddit.getPostById(event.post.id);
+            // 3. Extract Google Drive link
+            const driveLink = extractSupportedLink(post.url);
             if (!driveLink) {
-                console.log(`[Sountinel] Post ${post.id} has no supported Google Drive link - skipping`);
+                console.log(`[Sountinel] Post ${post.id} has no Google Drive link - skipping`);
                 return;
             }
             console.log(`[Sountinel] Extracted Drive link: ${driveLink}`);
-            // 3. Extract Drive ID
-            const driveId = extractGoogleDriveId(driveLink);
-            if (!driveId) {
-                console.warn(`[Sountinel] Could not extract Drive ID from: ${driveLink}`);
+            // 4. Prepare payload
+            const payload = {
+                postId: post.id,
+                title: post.title,
+                author: post.authorName || '[deleted]',
+                subreddit: post.subredditName,
+                url: post.url,
+                permalink: post.permalink,
+                score: post.score,
+                numComments: post.numberOfComments,
+                createdAt: Math.floor(post.createdAt.getTime() / 1000),
+                driveUrl: driveLink,
+            };
+            // 5. Create GitHub Issue
+            const response = await fetch(`https://api.github.com/repos/${githubRepo}/issues`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${githubToken}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
+                body: JSON.stringify({
+                    title: `Reddit Post: ${post.id}`,
+                    body: `# Reddit Post from r/${post.subredditName}\n\n` +
+                        `**Post**: [${post.title}](https://reddit.com${post.permalink})\n` +
+                        `**Author**: u/${post.authorName || '[deleted]'}\n` +
+                        `**Drive Link**: ${driveLink}\n\n` +
+                        `## Payload\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``,
+                    labels: ['pending', 'sountinel'],
+                }),
+            });
+            if (response.ok) {
+                const issue = await response.json();
+                console.log(`[Sountinel] ✅ Created GitHub issue #${issue.number}: ${issue.html_url}`);
             }
-            console.log(`[Sountinel] Post ${post.id} ready for webhook processing`);
-            console.log(`[Sountinel] TODO Phase 2: Sign and send to AWS API Gateway`);
+            else {
+                const errorText = await response.text();
+                console.error(`[Sountinel] ❌ GitHub API failed: ${response.status}`, errorText);
+            }
         }
         catch (error) {
-            console.error('[Sountinel] Error processing post:', error);
-            // Don't throw - we don't want to break the subreddit if our monitoring fails
+            console.error('[Sountinel] ❌ Error:', error);
         }
     },
 });

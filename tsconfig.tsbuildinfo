@@ -1,1 +1,1 @@
-{"root":["./src/googledrivevalidator.ts","./src/hmac.ts","./src/linkextractor.ts","./src/main.ts","./src/nuke.ts","./src/__tests__/googledrivevalidator.test.ts","./src/__tests__/hmac.test.ts","./src/__tests__/linkextractor.test.ts"],"errors":true,"version":"5.8.3"}
+{"root":["./src/linkextractor.ts","./src/main.ts","./src/__tests__/linkextractor.test.ts"],"errors":true,"version":"5.8.3"}
