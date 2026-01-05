@@ -2,5 +2,4 @@ name: sountinel
 http:
   fetch:
     allowedDomains:
-      - "*.execute-api.ca-central-1.amazonaws.com"
-      - "axp7cyasld.execute-api.ca-central-1.amazonaws.com"
+      - "api.github.com"
