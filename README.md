@@ -1,19 +1,20 @@
-# Sountinel - Reddit Post Monitor
+# Sountinel - Reddit-to-GitHub Bridge
 
-Devvit app that monitors r/Drumkits for posts containing Google Drive links to drum kit sample packs.
+A Devvit app that monitors subreddit posts for Google Drive links and creates GitHub Issues with structured post metadata.
 
-## Architecture
+## What It Does
 
-**GitHub Bridge Pattern:**
-```
-Reddit → Devvit PostSubmit → GitHub Issues → AWS Lambda (polling) → DynamoDB
-```
+When a new post containing a Google Drive link is submitted to your subreddit:
 
-- **Devvit** creates GitHub Issues with post metadata
-- **AWS Lambda** polls GitHub Issues every hour
-- **DynamoDB** stores processed posts
+1. **Detects** the post via Reddit's PostSubmit event
+2. **Extracts** Google Drive URLs from the post
+3. **Creates** a GitHub Issue with formatted post metadata and JSON payload
 
-This architecture solves Devvit's HTTP allowlist restrictions (AWS endpoints blocked, but GitHub API is allowed).
+The app acts as a reliable bridge from Reddit to GitHub Issues, where you can process posts using your own automation (GitHub Actions, webhooks, polling services, etc.).
+
+## Why Use This Pattern?
+
+Devvit's HTTP plugin has strict allowlist restrictions - you can't directly call most external APIs (AWS, custom backends, etc.). However, GitHub's API is allowed. This app leverages that to create a simple, reliable integration point.
 
 ## Quick Start
 
@@ -38,21 +39,20 @@ Settings must be configured via the [Developer Portal](https://developers.reddit
    - Can differ per subreddit installation
    - Configure after installation at: https://developers.reddit.com/r/SUBREDDIT/apps/sountinel
 
-### Install to Test Subreddit
+### Install to Subreddit
 
 ```bash
-# Create a small test subreddit first (<200 members for private apps)
-npx devvit install sountinel_dev
+# Install to your test subreddit (must have <200 members for unlisted apps)
+npx devvit install YOUR_SUBREDDIT_NAME
 ```
 
 ### Test
 
-Create a test post in r/sountinel_dev with a Google Drive link:
-- Example: `https://drive.google.com/file/d/1ABC123/view`
+1. Create a test post in your subreddit with a Google Drive link
+2. Check the logs:
 
-Check logs:
 ```bash
-npx devvit logs sountinel_dev
+npx devvit logs YOUR_SUBREDDIT_NAME
 ```
 
 Expected output:
@@ -62,7 +62,7 @@ Expected output:
 [Sountinel] ✅ Created GitHub issue #X: https://github.com/...
 ```
 
-Verify the GitHub issue was created at: https://github.com/20hertz/sountinel-queue/issues
+3. Verify the GitHub issue was created in your configured repository
 
 ## Development
 
@@ -98,13 +98,13 @@ sountinel/
 
 ## How It Works
 
-1. **PostSubmit Trigger**: Fires when new post created in r/Drumkits
-2. **Extract Drive Link**: Parses post URL for Google Drive links
+1. **PostSubmit Trigger**: Fires when a new post is created in your subreddit
+2. **Extract Drive Link**: Parses the post URL for Google Drive links
 3. **Create GitHub Issue**:
    - Title: `Reddit Post: t3_xxxxx`
    - Body: Formatted markdown with post metadata + JSON payload
    - Labels: `pending`, `sountinel`
-4. **AWS Lambda** (separate project): Polls issues hourly and processes them
+4. **Done**: The app's job is complete. Process the GitHub Issues however you want (GitHub Actions, webhooks, polling, manual review, etc.)
 
 ## Supported Google Drive URLs
 
@@ -119,10 +119,12 @@ Posts without Drive links are silently skipped.
 
 ## GitHub Issue Format
 
-```markdown
-# Reddit Post from r/Drumkits
+Each detected post creates an issue with this structure:
 
-**Post**: [Title](https://reddit.com/r/Drumkits/comments/...)
+```markdown
+# Reddit Post from r/YourSubreddit
+
+**Post**: [Post Title](https://reddit.com/r/YourSubreddit/comments/...)
 **Author**: u/username
 **Drive Link**: https://drive.google.com/...
 
@@ -132,9 +134,9 @@ Posts without Drive links are silently skipped.
   "postId": "t3_xxxxx",
   "title": "Post title",
   "author": "username",
-  "subreddit": "Drumkits",
+  "subreddit": "YourSubreddit",
   "url": "https://drive.google.com/...",
-  "permalink": "/r/Drumkits/comments/...",
+  "permalink": "/r/YourSubreddit/comments/...",
   "score": 42,
   "numComments": 5,
   "createdAt": 1234567890,
@@ -142,6 +144,8 @@ Posts without Drive links are silently skipped.
 }
 ```
 ```
+
+The JSON payload can be easily parsed by automation tools for downstream processing.
 
 ## Production Deployment
 
@@ -157,19 +161,17 @@ Apps using the HTTP plugin require privacy policy and terms & conditions:
 ### Publishing
 
 ```bash
-# 1. Publish the app
+# 1. Publish the app (makes it unlisted - installable by any moderator)
 npx devvit publish
 
-# 2. Wait for Reddit approval (can take several days)
+# 2. Install to your production subreddit
+npx devvit install YOUR_SUBREDDIT
 
-# 3. Install to r/Drumkits (after approval)
-npx devvit install Drumkits
+# 3. Configure settings via Developer Portal
+# https://developers.reddit.com/r/YOUR_SUBREDDIT/apps/sountinel
 
-# 4. Configure settings via Developer Portal
-# https://developers.reddit.com/r/Drumkits/apps/sountinel
-
-# 5. Monitor logs
-npx devvit logs Drumkits
+# 4. Monitor logs
+npx devvit logs YOUR_SUBREDDIT
 ```
 
 ## Troubleshooting
@@ -178,12 +180,12 @@ npx devvit logs Drumkits
 
 Check logs for errors:
 ```bash
-npx devvit logs sountinel_dev
+npx devvit logs YOUR_SUBREDDIT
 ```
 
 Verify settings via Developer Portal:
 - App settings: https://developers.reddit.com/apps/sountinel
-- Installation settings: https://developers.reddit.com/r/sountinel_dev/apps/sountinel
+- Installation settings: https://developers.reddit.com/r/YOUR_SUBREDDIT/apps/sountinel
 
 Common issues:
 - GitHub token invalid or expired (check token has `repo` scope)
@@ -194,16 +196,23 @@ Common issues:
 ### GitHub API errors
 
 - Verify token has `repo` scope
-- Check rate limits: 5,000 requests/hour (we use ~4/hour)
+- Check rate limits: 5,000 requests/hour for authenticated requests
 - Test token manually: `curl -H "Authorization: Bearer $TOKEN" https://api.github.com/user`
 
-## Related Projects
+## Use Cases
 
-- **reddit-monitor**: AWS Lambda poller (processes GitHub Issues)
-- **boomtap-planning**: Task planning and architecture docs
+- **Content Curation**: Collect and process user-submitted content links
+- **Moderation Queues**: Review flagged posts in a structured format
+- **Archival**: Store subreddit activity with metadata
+- **Integration**: Bridge Reddit posts to external systems via GitHub webhooks/actions
+- **Analytics**: Process post data for insights and reporting
 
 ## Learn More
 
 - [Devvit Documentation](https://developers.reddit.com/docs/)
 - [Developer Portal](https://developers.reddit.com/my/apps)
-- [Implementation Plan](../boomtap-planning/tasks/reddit-monitor-github-bridge-implementation.md)
+- [GitHub Issues API](https://docs.github.com/en/rest/issues/issues)
+
+## License
+
+MIT
