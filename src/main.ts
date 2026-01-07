@@ -68,8 +68,8 @@ Devvit.addTrigger({
         return;
       }
 
-      // 2. Get post details
-      const post = await context.reddit.getPostById(event.post!.id);
+      // 2. Get post details from event (post may not be available via API yet)
+      const post = event.post!;
 
       // 3. Extract Google Drive link
       const driveLink = extractSupportedLink(post.url);
@@ -90,7 +90,7 @@ Devvit.addTrigger({
         permalink: post.permalink,
         score: post.score,
         numComments: post.numberOfComments,
-        createdAt: Math.floor(post.createdAt.getTime() / 1000),
+        createdAt: typeof post.createdAt === 'number' ? post.createdAt : Math.floor(post.createdAt.getTime() / 1000),
         driveUrl: driveLink,
       };
 
