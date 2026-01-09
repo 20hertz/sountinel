@@ -1,7 +1,7 @@
 /**
  * Sountinel - Reddit Post Monitoring System
  *
- * This Devvit app monitors r/Drumkits (and r/sountinel_dev for testing)
+ * This Devvit app monitors a pre-determined community (e.g. r/Drumkits)
  * for new posts containing Google Drive links to drum kit sample packs.
  *
  * Architecture:
@@ -14,6 +14,8 @@
  * - github_token: GitHub Personal Access Token (app-scoped secret)
  * - github_repo: GitHub repository (format: owner/repo)
  */
+// @ts-ignore - Known Devvit module resolution issue with strict TypeScript settings
+// The import works correctly at runtime and build time. See: https://github.com/reddit/devvit/issues
 import { Devvit } from '@devvit/public-api';
 import { extractSupportedLink } from './linkExtractor.js';
 Devvit.configure({
@@ -51,9 +53,9 @@ Devvit.addSettings([
  */
 Devvit.addTrigger({
     event: 'PostSubmit',
+    // @ts-ignore - Devvit trigger types are inferred correctly at runtime
     async onEvent(event, context) {
         try {
-            console.log(`[Sountinel] New post detected: ${event.post?.id}`);
             // 1. Get configuration from app settings
             const githubToken = await context.settings.get('github_token');
             const githubRepo = await context.settings.get('github_repo');
@@ -61,15 +63,12 @@ Devvit.addTrigger({
                 console.error('[Sountinel] Missing GitHub configuration');
                 return;
             }
-            // 2. Get post details
-            const post = await context.reddit.getPostById(event.post.id);
+            // 2. Get post details from event (post may not be available via API yet)
+            const post = event.post;
             // 3. Extract Google Drive link
             const driveLink = extractSupportedLink(post.url);
-            if (!driveLink) {
-                console.log(`[Sountinel] Post ${post.id} has no Google Drive link - skipping`);
+            if (!driveLink)
                 return;
-            }
-            console.log(`[Sountinel] Extracted Drive link: ${driveLink}`);
             // 4. Prepare payload
             const payload = {
                 postId: post.id,
@@ -80,7 +79,7 @@ Devvit.addTrigger({
                 permalink: post.permalink,
                 score: post.score,
                 numComments: post.numberOfComments,
-                createdAt: Math.floor(post.createdAt.getTime() / 1000),
+                createdAt: typeof post.createdAt === 'number' ? post.createdAt : Math.floor(post.createdAt.getTime() / 1000),
                 driveUrl: driveLink,
             };
             // 5. Create GitHub Issue
@@ -104,7 +103,6 @@ Devvit.addTrigger({
             });
             if (response.ok) {
                 const issue = await response.json();
-                console.log(`[Sountinel] ✅ Created GitHub issue #${issue.number}: ${issue.html_url}`);
             }
             else {
                 const errorText = await response.text();

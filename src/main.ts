@@ -1,7 +1,7 @@
 /**
  * Sountinel - Reddit Post Monitoring System
  *
- * This Devvit app monitors r/Drumkits (and r/sountinel_dev for testing)
+ * This Devvit app monitors a pre-determined community (e.g. r/Drumkits)
  * for new posts containing Google Drive links to drum kit sample packs.
  *
  * Architecture:
@@ -57,14 +57,13 @@ Devvit.addTrigger({
   event: 'PostSubmit',
   async onEvent(event, context) {
     try {
-      console.log(`[Sountinel] New post detected: ${event.post?.id}`);
 
       // 1. Get configuration from app settings
-      const githubToken = await context.settings.get('github_token') as string;
-      const githubRepo = await context.settings.get('github_repo') as string;
+      const githubToken = await context.settings.get<string>('github_token')
+      const githubRepo = await context.settings.get<string>('github_repo')
 
       if (!githubToken || !githubRepo) {
-        console.error('[Sountinel] Missing GitHub configuration');
+        console.error('Missing GitHub configuration');
         return;
       }
 
@@ -73,24 +72,19 @@ Devvit.addTrigger({
 
       // 3. Extract Google Drive link
       const driveLink = extractSupportedLink(post.url);
-      if (!driveLink) {
-        console.log(`[Sountinel] Post ${post.id} has no Google Drive link - skipping`);
-        return;
-      }
-
-      console.log(`[Sountinel] Extracted Drive link: ${driveLink}`);
-
+      if (!driveLink)  return;
+      
       // 4. Prepare payload
       const payload = {
         postId: post.id,
         title: post.title,
-        author: post.authorName || '[deleted]',
-        subreddit: post.subredditName,
+        author: post.authorId,
+        subreddit: post.subredditId,
         url: post.url,
         permalink: post.permalink,
         score: post.score,
-        numComments: post.numberOfComments,
-        createdAt: typeof post.createdAt === 'number' ? post.createdAt : Math.floor(post.createdAt.getTime() / 1000),
+        numComments: post.numComments,
+        createdAt: post.createdAt,
         driveUrl: driveLink,
       };
 
@@ -105,9 +99,9 @@ Devvit.addTrigger({
         },
         body: JSON.stringify({
           title: `Reddit Post: ${post.id}`,
-          body: `# Reddit Post from r/${post.subredditName}\n\n` +
+          body: `# Reddit Post from r/${post.subredditId}\n\n` +
                 `**Post**: [${post.title}](https://reddit.com${post.permalink})\n` +
-                `**Author**: u/${post.authorName || '[deleted]'}\n` +
+                `**Author**: u/${post.authorId}\n` +
                 `**Drive Link**: ${driveLink}\n\n` +
                 `## Payload\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``,
           labels: ['pending', 'sountinel'],
@@ -116,14 +110,13 @@ Devvit.addTrigger({
 
       if (response.ok) {
         const issue = await response.json();
-        console.log(`[Sountinel] ✅ Created GitHub issue #${issue.number}: ${issue.html_url}`);
       } else {
         const errorText = await response.text();
-        console.error(`[Sountinel] ❌ GitHub API failed: ${response.status}`, errorText);
+        console.error(`GitHub API failed: ${response.status}`, errorText);
       }
 
     } catch (error) {
-      console.error('[Sountinel] ❌ Error:', error);
+      console.error('Error:', error);
     }
   },
 });
