@@ -36,7 +36,7 @@ const GDRIVE_PATTERNS = [
  * @param url - URL to extract from (typically post.url)
  * @returns The original URL if it matches a supported pattern, null otherwise
  */
-export function extractSupportedLink(url: string): string | null {
+export function extractSupportedLink(url: string) {
   if (!url) {
     return null;
   }

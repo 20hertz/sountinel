@@ -1,4 +1,4 @@
-# Sountinel - Reddit-to-GitHub Bridge
+# Sountinel
 
 A Devvit app that monitors subreddit posts for Google Drive links and creates GitHub Issues with structured post metadata.
 
@@ -139,8 +139,7 @@ Each detected post creates an issue with this structure:
   "permalink": "/r/YourSubreddit/comments/...",
   "score": 42,
   "numComments": 5,
-  "createdAt": 1234567890,
-  "driveUrl": "https://drive.google.com/..."
+  "createdAt": 1234567890
 }
 ```
 ```

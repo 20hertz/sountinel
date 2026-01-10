@@ -78,14 +78,13 @@ Devvit.addTrigger({
       const payload = {
         postId: post.id,
         title: post.title,
-        author: post.authorId,
-        subreddit: post.subredditId,
+        author: event.author?.name || 'unknown',
+        subreddit: event.subreddit?.name || 'unknown',
         url: post.url,
         permalink: post.permalink,
         score: post.score,
         numComments: post.numComments,
         createdAt: post.createdAt,
-        driveUrl: driveLink,
       };
 
       // 5. Create GitHub Issue
@@ -99,9 +98,9 @@ Devvit.addTrigger({
         },
         body: JSON.stringify({
           title: `Reddit Post: ${post.id}`,
-          body: `# Reddit Post from r/${post.subredditId}\n\n` +
+          body: `# Reddit Post from r/${event.subreddit?.name || 'unknown'}\n\n` +
                 `**Post**: [${post.title}](https://reddit.com${post.permalink})\n` +
-                `**Author**: u/${post.authorId}\n` +
+                `**Author**: u/${event.author?.name || 'unknown'}\n` +
                 `**Drive Link**: ${driveLink}\n\n` +
                 `## Payload\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``,
           labels: ['pending', 'sountinel'],
