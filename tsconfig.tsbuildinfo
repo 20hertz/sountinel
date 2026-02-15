@@ -1,1 +1,1 @@
-{"root":["./src/linkextractor.ts","./src/main.ts","./src/__tests__/linkextractor.test.ts"],"version":"5.8.3"}
+{"root":["./src/comments.ts","./src/config.ts","./src/main.ts","./src/types.ts","./src/__tests__/comments.test.ts","./src/__tests__/config.test.ts","./src/__tests__/providers/index.test.ts","./src/providers/dropbox.ts","./src/providers/googledrive.ts","./src/providers/index.ts","./src/providers/mediafire.ts"],"version":"5.9.3"}

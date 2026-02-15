@@ -1,217 +1,139 @@
 # Sountinel
 
-A Devvit app that monitors subreddit posts for Google Drive links and creates GitHub Issues with structured post metadata.
+A Devvit app that validates links posted to r/Drumkits. Checks that shared files are publicly accessible and contain audio content.
 
 ## What It Does
 
-When a new post containing a Google Drive link is submitted to your subreddit:
+When a new post is submitted to r/Drumkits:
 
-1. **Detects** the post via Reddit's PostSubmit event
-2. **Extracts** Google Drive URLs from the post
-3. **Creates** a GitHub Issue with formatted post metadata and JSON payload
+1. **Identifies** the file host (Google Drive, Dropbox, or MediaFire)
+2. **Validates accessibility** — is the link public? (no login/permission required)
+3. **Checks for audio content** — does the link point to audio files or archives?
+4. **Acts on the result**:
+   - **Pass**: Post stays up, nothing happens
+   - **Fail**: Post is removed with a sticky comment explaining why and how to fix it
+   - **Error/Uncertain**: Post is reported to the mod queue for human review
 
-The app acts as a reliable bridge from Reddit to GitHub Issues, where you can process posts using your own automation (GitHub Actions, webhooks, polling services, etc.).
+Posts using unsupported file hosts are handled by AutoModerator (provider allowlist), not this app.
 
-## Why Use This Pattern?
+## Supported Providers
 
-Devvit's HTTP plugin has strict allowlist restrictions - you can't directly call most external APIs (AWS, custom backends, etc.). However, GitHub's API is allowed. This app leverages that to create a simple, reliable integration point.
+| Provider | Validation Method | Folders |
+|----------|------------------|---------|
+| Google Drive | Drive API v3 (API key) | API traversal, 1 level deep |
+| Dropbox | HTTP scraping | Sent to mod queue |
+| MediaFire | HTTP scraping | Sent to mod queue |
 
 ## Quick Start
 
-### Deploy App
+### Prerequisites
+
+- [Devvit CLI](https://developers.reddit.com/docs/get-started/quickstart/) installed
+- A Google Drive API key ([create one](https://console.cloud.google.com/apis/credentials) — takes 5 minutes, no OAuth needed)
+- Moderator access to a test subreddit
+
+### Deploy
 
 ```bash
 # Upload to Devvit
 npm run deploy
 ```
 
-### Configure Settings
-
-Settings must be configured via the [Developer Portal](https://developers.reddit.com/apps/sountinel):
-
-1. **GitHub Personal Access Token** (app-scoped)
-   - Create at [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` scope
-   - Set once for all installations
-   - Configure at: https://developers.reddit.com/apps/sountinel
-
-2. **GitHub Repository** (installation-scoped)
-   - Format: `owner/repo` (e.g., `20hertz/sountinel-queue`)
-   - Can differ per subreddit installation
-   - Configure after installation at: https://developers.reddit.com/r/SUBREDDIT/apps/sountinel
-
-### Install to Subreddit
+### Configure the API Key
 
 ```bash
-# Install to your test subreddit (must have <200 members for unlisted apps)
-npx devvit install YOUR_SUBREDDIT_NAME
+# Set the Google Drive API key (app-scoped secret)
+npx devvit settings set google_drive_api_key --app sountinel
+```
+
+### Install to a Subreddit
+
+```bash
+# Install to your test subreddit
+npx devvit install <subreddit_name>
 ```
 
 ### Test
 
-1. Create a test post in your subreddit with a Google Drive link
+1. Create a test post with a Google Drive / Dropbox / MediaFire link
 2. Check the logs:
 
 ```bash
-npx devvit logs YOUR_SUBREDDIT_NAME
+npx devvit logs <subreddit_name>
 ```
 
-Expected output:
+## Project Structure
+
 ```
-[Sountinel] New post detected: t3_xxxxx
-[Sountinel] Extracted Drive link: https://drive.google.com/...
-[Sountinel] ✅ Created GitHub issue #X: https://github.com/...
+sountinel/
+  devvit.yaml              # HTTP domain allowlist for all 3 providers
+  src/
+    main.ts                # PostSubmit trigger → validate → remove/report
+    types.ts               # ValidationResult, Provider, FailureType
+    config.ts              # Audio/archive extensions, helpers
+    comments.ts            # Removal comment templates + flair text
+    providers/
+      index.ts             # Provider detection + dispatch
+      googleDrive.ts       # Google Drive API v3 validation
+      dropbox.ts           # Dropbox HTTP validation
+      mediafire.ts         # MediaFire HTTP validation
+    __tests__/
+      config.test.ts
+      comments.test.ts
+      providers/
+        index.test.ts
 ```
 
-3. Verify the GitHub issue was created in your configured repository
+## How Validation Works
+
+### Google Drive
+- Extracts file/folder ID from URL
+- Calls Drive API v3 for metadata (name, mimeType, size)
+- HTTP 403 → private link, HTTP 404 → dead link
+- Single files: checks extension against audio formats
+- ZIP/RAR/7z: assumed to contain audio
+- Folders: lists root files, then 1 level of subfolders. No audio after traversal → mod queue (not auto-remove)
+
+### Dropbox & MediaFire
+- Fetches the shared link page via HTTP GET
+- Parses HTML for error states (deleted, private, password-protected)
+- Checks filename from URL path or `og:title` meta tag
+- Folders → mod queue (JS-rendered listings can't be reliably parsed)
+
+### Moderation Actions
+
+| Result | Action | Flair |
+|--------|--------|-------|
+| Private/login required | Remove + comment | `Needs Fix: Private Link` |
+| 404 / dead link | Remove + comment | `Removed: Dead Link` |
+| No audio (single file) | Remove + comment | `Removed: No Audio` |
+| No audio (folder, after traversal) | Report to mod queue | `Needs Review` |
+| API timeout / error | Report to mod queue | `Needs Review` |
+
+**Principle**: When in doubt, don't remove. Send to mod queue.
 
 ## Development
 
-### Local Development
-
 ```bash
-# Install dependencies
-npm install
+# Type check
+npm run type-check
 
 # Run tests
 npm test
 
-# Type check
-npm run type-check
+# Playtest locally
+npm run dev
 
-# Deploy changes
+# Deploy
 npm run deploy
 ```
-
-### Project Structure
-
-```
-sountinel/
-├── src/
-│   ├── main.ts              # PostSubmit handler (creates GitHub issues)
-│   ├── linkExtractor.ts     # Google Drive URL extraction
-│   └── __tests__/           # Unit tests
-├── devvit.yaml              # Devvit config (HTTP allowlist)
-├── PRIVACY.md               # Privacy policy (required for publishing)
-├── TERMS.md                 # Terms & conditions (required for publishing)
-└── package.json
-```
-
-## How It Works
-
-1. **PostSubmit Trigger**: Fires when a new post is created in your subreddit
-2. **Extract Drive Link**: Parses the post URL for Google Drive links
-3. **Create GitHub Issue**:
-   - Title: `Reddit Post: t3_xxxxx`
-   - Body: Formatted markdown with post metadata + JSON payload
-   - Labels: `pending`, `sountinel`
-4. **Done**: The app's job is complete. Process the GitHub Issues however you want (GitHub Actions, webhooks, polling, manual review, etc.)
-
-## Supported Google Drive URLs
-
-- `https://drive.google.com/file/d/{id}`
-- `https://drive.google.com/open?id={id}`
-- `https://drive.google.com/drive/folders/{id}`
-- `https://docs.google.com/document/d/{id}`
-- `https://docs.google.com/spreadsheets/d/{id}`
-- `https://docs.google.com/presentation/d/{id}`
-
-Posts without Drive links are silently skipped.
-
-## GitHub Issue Format
-
-Each detected post creates an issue with this structure:
-
-```markdown
-# Reddit Post from r/YourSubreddit
-
-**Post**: [Post Title](https://reddit.com/r/YourSubreddit/comments/...)
-**Author**: u/username
-**Drive Link**: https://drive.google.com/...
-
-## Payload
-```json
-{
-  "postId": "t3_xxxxx",
-  "title": "Post title",
-  "author": "username",
-  "subreddit": "YourSubreddit",
-  "url": "https://drive.google.com/...",
-  "permalink": "/r/YourSubreddit/comments/...",
-  "score": 42,
-  "numComments": 5,
-  "createdAt": 1234567890
-}
-```
-```
-
-The JSON payload can be easily parsed by automation tools for downstream processing.
-
-## Production Deployment
-
-### Prerequisites
-
-Apps using the HTTP plugin require privacy policy and terms & conditions:
-
-1. Ensure [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) are committed to GitHub
-2. Add URLs to Developer Portal settings:
-   - Privacy Policy: `https://raw.githubusercontent.com/20hertz/sountinel/main/PRIVACY.md`
-   - Terms & Conditions: `https://raw.githubusercontent.com/20hertz/sountinel/main/TERMS.md`
-
-### Publishing
-
-```bash
-# 1. Publish the app (makes it unlisted - installable by any moderator)
-npx devvit publish
-
-# 2. Install to your production subreddit
-npx devvit install YOUR_SUBREDDIT
-
-# 3. Configure settings via Developer Portal
-# https://developers.reddit.com/r/YOUR_SUBREDDIT/apps/sountinel
-
-# 4. Monitor logs
-npx devvit logs YOUR_SUBREDDIT
-```
-
-## Troubleshooting
-
-### No issues created in GitHub
-
-Check logs for errors:
-```bash
-npx devvit logs YOUR_SUBREDDIT
-```
-
-Verify settings via Developer Portal:
-- App settings: https://developers.reddit.com/apps/sountinel
-- Installation settings: https://developers.reddit.com/r/YOUR_SUBREDDIT/apps/sountinel
-
-Common issues:
-- GitHub token invalid or expired (check token has `repo` scope)
-- GitHub repo name incorrect (format: `owner/repo`)
-- Settings not configured via Developer Portal
-- Post URL doesn't contain Google Drive link
-
-### GitHub API errors
-
-- Verify token has `repo` scope
-- Check rate limits: 5,000 requests/hour for authenticated requests
-- Test token manually: `curl -H "Authorization: Bearer $TOKEN" https://api.github.com/user`
-
-## Use Cases
-
-- **Content Curation**: Collect and process user-submitted content links
-- **Moderation Queues**: Review flagged posts in a structured format
-- **Archival**: Store subreddit activity with metadata
-- **Integration**: Bridge Reddit posts to external systems via GitHub webhooks/actions
-- **Analytics**: Process post data for insights and reporting
 
 ## Learn More
 
 - [Devvit Documentation](https://developers.reddit.com/docs/)
 - [Developer Portal](https://developers.reddit.com/my/apps)
-- [GitHub Issues API](https://docs.github.com/en/rest/issues/issues)
+- [Google Drive API v3](https://developers.google.com/drive/api/v3/reference)
 
 ## License
 
-MIT
+BSD-3-Clause

@@ -1,121 +1,77 @@
-/**
- * Sountinel - Reddit Post Monitoring System
- *
- * This Devvit app monitors a pre-determined community (e.g. r/Drumkits)
- * for new posts containing Google Drive links to drum kit sample packs.
- *
- * Architecture:
- * - Listens for PostSubmit events
- * - Extracts Google Drive links from post URLs
- * - Creates GitHub Issues with post metadata
- * - AWS Lambda polls GitHub Issues and processes them
- *
- * Settings (configured via Devvit CLI or Reddit Developer Portal):
- * - github_token: GitHub Personal Access Token (app-scoped secret)
- * - github_repo: GitHub repository (format: owner/repo)
- */
-
 import { Devvit } from '@devvit/public-api';
-import { extractSupportedLink } from './linkExtractor.js';
+import { identifyProvider, validateLink } from './providers/index.js';
+import { buildComment, getFlairText } from './comments.js';
 
 Devvit.configure({
   redditAPI: true,
   http: true,
 });
 
-// App settings
 Devvit.addSettings([
   {
     type: 'string',
     name: 'github_token',
-    label: 'GitHub Personal Access Token',
-    helpText: 'Create at github.com/settings/tokens with repo scope',
+    label: 'Google Drive API Key',
+    helpText: 'API key for Google Drive v3 API (reuses github_token key due to Devvit settings bug)',
     isSecret: true,
     scope: 'app',
   },
-  {
-    type: 'string',
-    name: 'github_repo',
-    label: 'GitHub Queue Repository',
-    helpText: 'Format: owner/repo (e.g., 20hertz/sountinel-queue)',
-    defaultValue: '20hertz/sountinel-queue',
-    scope: 'installation',
-  },
 ]);
 
-/**
- * PostSubmit trigger - listens for new posts in the subreddit
- *
- * When a new post is submitted, this handler:
- * 1. Gets GitHub configuration from settings
- * 2. Extracts Google Drive links from post URL
- * 3. Prepares payload with post metadata
- * 4. Creates GitHub Issue with formatted body
- * 5. AWS Lambda polls issues hourly and processes them
- */
 Devvit.addTrigger({
   event: 'PostSubmit',
   async onEvent(event, context) {
+    console.log('[Sountinel] PostSubmit trigger fired');
+    const post = event.post;
+    console.log(`[Sountinel] post.url = ${post?.url ?? '(none)'}`);
+    if (!post?.url) return;
+
+    const provider = identifyProvider(post.url);
+    console.log(`[Sountinel] provider = ${provider ?? '(none)'}`);
+    if (!provider) return;
+
+    const apiKey = await context.settings.get<string>('github_token');
+    console.log(`[Sountinel] apiKey present = ${!!apiKey}`);
+
     try {
+      const result = await validateLink(provider, post.url, apiKey ?? undefined);
+      console.log(`[Sountinel] result: status=${result.status}, failureType=${result.failureType ?? 'none'}, message=${result.message ?? 'OK'}`);
 
-      // 1. Get configuration from app settings
-      const githubToken = await context.settings.get<string>('github_token')
-      const githubRepo = await context.settings.get<string>('github_repo')
+      if (result.status === 'PASS') return;
 
-      if (!githubToken || !githubRepo) {
-        console.error('Missing GitHub configuration');
+      const subredditName = await context.reddit.getCurrentSubredditName();
+
+      if (result.status === 'ERROR') {
+        // Don't remove — report to mod queue for human review
+        const postObj = await context.reddit.getPostById(post.id);
+        const reason = `Sountinel: ${result.message ?? 'needs review'}`.slice(0, 100);
+        await context.reddit.report(postObj, { reason });
+        if (result.failureType) {
+          await context.reddit.setPostFlair({
+            subredditName,
+            postId: post.id,
+            text: getFlairText(result.failureType, provider),
+          });
+        }
         return;
       }
 
-      // 2. Get post details from event (post may not be available via API yet)
-      const post = event.post!;
+      // FAIL — remove post, add sticky comment, set flair
+      await context.reddit.remove(post.id, false);
 
-      // 3. Extract Google Drive link
-      const driveLink = extractSupportedLink(post.url);
-      if (!driveLink)  return;
-      
-      // 4. Prepare payload
-      const payload = {
-        postId: post.id,
-        title: post.title,
-        author: event.author?.name || 'unknown',
-        subreddit: event.subreddit?.name || 'unknown',
-        url: post.url,
-        permalink: post.permalink,
-        score: post.score,
-        numComments: post.numComments,
-        createdAt: post.createdAt,
-      };
-
-      // 5. Create GitHub Issue
-      const response = await fetch(`https://api.github.com/repos/${githubRepo}/issues`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${githubToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-        body: JSON.stringify({
-          title: `Reddit Post: ${post.id}`,
-          body: `# Reddit Post from r/${event.subreddit?.name || 'unknown'}\n\n` +
-                `**Post**: [${post.title}](https://reddit.com${post.permalink})\n` +
-                `**Author**: u/${event.author?.name || 'unknown'}\n` +
-                `**Drive Link**: ${driveLink}\n\n` +
-                `## Payload\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``,
-          labels: ['pending', 'sountinel'],
-        }),
+      const comment = await context.reddit.submitComment({
+        id: post.id,
+        text: buildComment(result.failureType!, provider, post.url),
       });
+      await comment.distinguish(true); // true = make sticky
 
-      if (response.ok) {
-        const issue = await response.json();
-      } else {
-        const errorText = await response.text();
-        console.error(`GitHub API failed: ${response.status}`, errorText);
-      }
-
+      await context.reddit.setPostFlair({
+        subredditName,
+        postId: post.id,
+        text: getFlairText(result.failureType!, provider),
+      });
     } catch (error) {
-      console.error('Error:', error);
+      console.error(`Sountinel validation error for ${post.url}:`, error);
     }
   },
 });

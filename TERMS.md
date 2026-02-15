@@ -1,6 +1,6 @@
 # Terms and Conditions for Sountinel
 
-**Last Updated**: January 5, 2026
+**Last Updated**: February 13, 2026
 
 ## Acceptance of Terms
 
@@ -8,52 +8,52 @@ By installing or using Sountinel in your subreddit, you agree to these Terms and
 
 ## What Sountinel Does
 
-Sountinel is a Reddit bot that:
+Sountinel is a Reddit moderation bot that:
 
-1. Monitors posts in r/Drumkits (and configured subreddits) for Google Drive links
-2. Extracts metadata from posts containing sample pack links
-3. Indexes this information in the Boomtap sample pack discovery platform
-4. Makes the indexed content discoverable to music producers
+1. Monitors posts in configured subreddits for file-sharing links (Google Drive, Dropbox, MediaFire)
+2. Validates that links are publicly accessible (no login or permission required)
+3. Checks that links point to audio content (audio files or archives)
+4. Removes posts that fail validation, with a comment explaining the issue and how to fix it
+5. Reports ambiguous cases to the mod queue for human review
 
 ## How Sountinel Works
 
-Sountinel operates as follows:
-
 1. **Post Monitoring**: Listens for new posts via Reddit's PostSubmit event
-2. **Link Detection**: Identifies Google Drive links in post URLs
-3. **Data Collection**: Captures post metadata (title, author, upvotes, etc.)
-4. **Indexing**: Stores data in a database for use in the Boomtap platform
-5. **Processing Delay**: Posts are processed within 1 hour of submission
+2. **Link Detection**: Identifies Google Drive, Dropbox, and MediaFire links in post URLs
+3. **Validation**: Checks link accessibility via provider APIs or HTTP requests
+4. **Audio Check**: Verifies the linked content is audio files or archives
+5. **Moderation Action**: Removes invalid posts with an explanation, or reports uncertain cases to the mod queue
 
 ## Data Usage
 
-### What We Collect
-- Public Reddit post data only
-- Google Drive links from post URLs
-- Post metadata (upvotes, comments, timestamps)
+### What We Access
+- Public Reddit post data (title, URL, author, subreddit)
+- File metadata from Google Drive API (file name, type, size — not file contents)
+- HTML page content from Dropbox and MediaFire shared links (for accessibility checks)
 
-### What We Do NOT Collect
-- Private messages
+### What We Do NOT Access
+- Private messages or comments
 - User account information beyond public usernames
+- File contents (we never download files)
 - Deleted or removed posts (after deletion)
 
 See our [Privacy Policy](PRIVACY.md) for detailed information.
 
 ## User Responsibilities
 
-If you post to r/Drumkits:
+If you post to a subreddit using Sountinel:
 
+- **Public Links**: Ensure your file-sharing links are publicly accessible
+- **Audio Content**: Links should point to audio files or archives containing audio
 - **Content Ownership**: You must own or have permission to share linked content
-- **Valid Links**: Links should point to legitimate drum kit sample packs
 - **Copyright**: You are responsible for ensuring shared content does not violate copyright
-- **Accuracy**: Post titles should accurately describe the linked content
 
 ## Subreddit Moderator Rights
 
 Subreddit moderators can:
 
 - Request removal of Sountinel from their subreddit at any time
-- Request removal of specific indexed posts
+- Override Sountinel's moderation decisions (approve removed posts, etc.)
 - Configure Sountinel settings via the Reddit Developer Portal
 
 ## Service Availability
@@ -61,29 +61,29 @@ Subreddit moderators can:
 Sountinel is provided "AS IS" without warranties:
 
 - **No Uptime Guarantee**: We do not guarantee 24/7 availability
-- **Processing Delays**: Posts may take up to 1 hour to process
+- **Validation Limits**: Validation depends on third-party APIs (Google, Dropbox, MediaFire) which may be unavailable
 - **Service Changes**: We may modify or discontinue features at any time
-- **Maintenance**: Scheduled or emergency maintenance may occur
+- **False Positives**: Sountinel may occasionally remove valid posts or miss invalid ones
 
 ## Limitations of Liability
 
 We are NOT responsible for:
 
-- Availability or accessibility of Google Drive links
-- Content of linked sample packs
+- Availability or accessibility of file-sharing links
+- Content of linked files
 - Copyright violations in linked content
+- Incorrect moderation actions (false positives or false negatives)
 - Data loss or corruption
-- Any damages arising from use of Sountinel or indexed data
+- Any damages arising from use of Sountinel
 
-## Google Drive Links
+## Third-Party Services
 
-**Important Disclaimers**:
+Sountinel integrates with:
 
-- We do not host sample pack files
-- We only index links to Google Drive
-- Google Drive link availability is controlled by the link owner
-- Links may break or become inaccessible at any time
-- We are not responsible for the content of linked files
+- **Reddit**: Subject to Reddit's Terms of Service and API Terms
+- **Google Drive API**: Used for file metadata validation (subject to Google's Terms)
+- **Dropbox**: Shared link pages are accessed for validation (subject to Dropbox's Terms)
+- **MediaFire**: Shared link pages are accessed for validation (subject to MediaFire's Terms)
 
 ## Intellectual Property
 
@@ -93,26 +93,18 @@ We are NOT responsible for:
 
 ### Your Rights
 - You retain all rights to content you post on Reddit
-- Indexing your public Reddit post does not transfer ownership
+- Sountinel does not index, store, or redistribute your content
 
 ## Termination
 
 We reserve the right to:
 
 - Suspend or terminate Sountinel at any time
-- Block specific users or subreddits from indexing
-- Remove indexed content that violates these terms
+- Block specific users or subreddits
 
 You may:
 
-- Request removal from our index at any time
 - Stop using Sountinel by uninstalling it from your subreddit
-
-## Data Retention
-
-- Indexed data is retained indefinitely to maintain the sample pack archive
-- Deleted Reddit posts may remain in our index
-- To request data removal, contact us via email
 
 ## Changes to Terms
 
@@ -120,15 +112,6 @@ We may update these Terms and Conditions at any time:
 
 - Changes will be posted to this page with an updated date
 - Continued use after changes constitutes acceptance
-- We will not notify users individually of changes
-
-## Third-Party Services
-
-Sountinel integrates with:
-
-- **Reddit**: Subject to Reddit's Terms of Service and API Terms
-- **GitHub**: Used for processing queue (subject to GitHub's Terms)
-- **AWS**: Used for data storage (subject to AWS Terms)
 
 ## Governing Law
 
@@ -150,17 +133,8 @@ For questions, concerns, or requests:
 - **GitHub Issues**: https://github.com/20hertz/sountinel/issues
 - **Developer Portal**: https://developers.reddit.com/apps/sountinel
 
-## Acknowledgment
-
-By using Sountinel, you acknowledge that:
-
-- You have read and understood these Terms and Conditions
-- You agree to comply with all terms
-- You understand this is a free service with no guarantees
-- You accept the limitations of liability outlined above
-
 ---
 
-**Effective Date**: January 5, 2026
+**Effective Date**: February 13, 2026
 
-**Sountinel** is developed and maintained by 20Hertz for the Boomtap platform.
+**Sountinel** is developed and maintained by 20Hertz.
