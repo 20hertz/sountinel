@@ -4,7 +4,17 @@ import { buildComment, getFlairText } from './comments.js';
 
 Devvit.configure({
   redditAPI: true,
-  http: true,
+  http: {
+    domains: [
+      'www.googleapis.com',
+      'www.dropbox.com',
+      'dropbox.com',
+      'dl.dropboxusercontent.com',
+      'www.mediafire.com',
+      'mediafire.com',
+      'download.mediafire.com',
+    ],
+  },
 });
 
 Devvit.addSettings([

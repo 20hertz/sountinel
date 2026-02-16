@@ -1,12 +1,2 @@
 name: sountinel
 version: 0.1.0
-http:
-  fetch:
-    allowedDomains:
-      - "www.googleapis.com"
-      - "www.dropbox.com"
-      - "dropbox.com"
-      - "dl.dropboxusercontent.com"
-      - "www.mediafire.com"
-      - "mediafire.com"
-      - "download.mediafire.com"
