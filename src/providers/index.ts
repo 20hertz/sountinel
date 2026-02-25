@@ -12,8 +12,8 @@ export function identifyProvider(url: string): Provider | null {
   return null;
 }
 
-// Providers with approved fetch domains — others skip validation and go to mod queue
-const VALIDATED_PROVIDERS: Set<Provider> = new Set(['google_drive']);
+// Providers with approved fetch domains
+const VALIDATED_PROVIDERS: Set<Provider> = new Set(['google_drive', 'dropbox', 'mediafire']);
 
 export async function validateLink(
   provider: Provider,

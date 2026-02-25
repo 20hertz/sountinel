@@ -21,8 +21,8 @@ Posts using unsupported file hosts are handled by AutoModerator (provider allowl
 | Provider | Validation Method | Folders |
 |----------|------------------|---------|
 | Google Drive | Drive API v3 (API key) | API traversal, 1 level deep |
-| Dropbox | HTTP scraping | Sent to mod queue |
-| MediaFire | HTTP scraping | Sent to mod queue |
+| Dropbox | HTTP scraping | Pass if accessible (contents not inspectable) |
+| MediaFire | HTTP scraping | Pass if accessible (contents not inspectable) |
 
 ## Quick Start
 
@@ -98,7 +98,7 @@ sountinel/
 - Fetches the shared link page via HTTP GET
 - Parses HTML for error states (deleted, private, password-protected)
 - Checks filename from URL path or `og:title` meta tag
-- Folders → mod queue (JS-rendered listings can't be reliably parsed)
+- Folders: pass if accessible — file listings are JS-rendered (protobuf-based) and can't be reliably parsed without a protobuf library
 
 ### Moderation Actions
 
@@ -107,7 +107,7 @@ sountinel/
 | Private/login required | Remove + comment | `Needs Fix: Private Link` |
 | 404 / dead link | Remove + comment | `Removed: Dead Link` |
 | No audio (single file) | Remove + comment | `Removed: No Audio` |
-| No audio (folder, after traversal) | Report to mod queue | `Needs Review` |
+| No audio (Google Drive folder, after traversal) | Report to mod queue | `Needs Review` |
 | API timeout / error | Report to mod queue | `Needs Review` |
 
 **Principle**: When in doubt, don't remove. Send to mod queue.

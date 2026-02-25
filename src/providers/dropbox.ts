@@ -60,12 +60,11 @@ export async function validateDropbox(url: string): Promise<ValidationResult> {
       return { status: 'FAIL', failureType: 'PRIVATE_LINK', message: 'Dropbox link requires login or permission' };
     }
 
-    // For folders, check if the page lists any files
+    // For folders, if the page loaded without error/private/deleted indicators above,
+    // treat as accessible. Dropbox folder contents are JS-rendered (protobuf-based),
+    // making file listing inspection impractical without a protobuf parser.
     if (isFolder(url)) {
-      // Dropbox folder pages render file listings. If we can see the page
-      // and it doesn't show error states above, send to mod queue for review
-      // since parsing the JS-rendered file list is unreliable.
-      return { status: 'ERROR', failureType: 'NEEDS_REVIEW', message: 'Dropbox folder — cannot reliably inspect contents' };
+      return { status: 'PASS' };
     }
 
     // For single files, check filename from URL
